@@ -18,6 +18,12 @@ cities = {
 # Словарь сессий пользователей
 session_storage = {}
 
+# Координаты городов
+city_coordinates = {
+    'Москва': '55.751244,37.618423',
+    'Нью-Йорк': '40.712776,-74.005974',
+    'Париж': '48.856614,2.352222'
+}
 
 @app.route('/post', methods=['POST'])
 def main():
@@ -122,8 +128,14 @@ def handle_dialog(res, req):
                 res['response']['text'] = f'Верно! Это действительно {current_city}. Попробуем еще раз?'
                 session_storage[user_id]['guessed_cities'].append(current_city)
                 session_storage[user_id]['game_started'] = False
+
+                # Генерация ссылки на карту
+                city_coords = city_coordinates[current_city]
+                map_url = f'https://yandex.ru/maps/?mode=search&text={current_city}&ll={city_coords}'
+                res['response']['buttons'] += [
+                    {'title': 'Показать город на карте', 'url': map_url, 'hide': True}
+                ]
             else:
-                # Неправильный ответ
                 next_photo_idx = len([x for x in session_storage[user_id]['guessed_cities'] if x != current_city])
                 if next_photo_idx >= len(cities[current_city]):
                     # Все фотографии показаны, сообщаем ответ
@@ -162,7 +174,7 @@ def show_help_message(res):
         'Это простая игра, где нужно угадать загаданный мной город'
         'по фотографиям достопримечательностей.\n\n'
         '- Нажми **«Да»**, чтобы начать игру.\n'
-        '- Чтобы завершить игру, напиши **«нет»**. '
+        '- Чтобы завершить игру, напиши **«нет»**.'
     )
     res['response']['text'] = help_text
 
