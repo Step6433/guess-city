@@ -31,7 +31,8 @@ def main():
         'session': request.json['session'],
         'version': request.json['version'],
         'response': {
-            'end_session': False
+            'end_session': False,
+            'buttons': [{'title': 'Помощь', 'hide': True}]  # добавляем кнопку помощи
         }
     }
 
@@ -57,11 +58,16 @@ def handle_dialog(res, req):
     if req['session']['new']:
         res['response']['text'] = 'Привет! Назови свое имя!'
         session_storage[user_id] = {
-            'first_name': None,  # Имя пользователя
-            'game_started': False,  # Флаг начала игры
-            'guessed_cities': [],  # Список отгаданных городов
-            'current_city': None  # Текущий загаданный город
+            'first_name': None,       # Имя пользователя
+            'game_started': False,    # Флаг начала игры
+            'guessed_cities': [],     # Список отгаданных городов
+            'current_city': None      # Текущий загаданный город
         }
+        return
+
+    # Проверяем нажатие кнопки "помощь"
+    if 'Помощь' in req['request']['original_utterance']:
+        show_help_message(res)
         return
 
     # Получение имени пользователя
@@ -71,11 +77,11 @@ def handle_dialog(res, req):
             res['response']['text'] = 'Не расслышала имя. Повтори, пожалуйста!'
         else:
             session_storage[user_id]['first_name'] = first_name
-            session_storage[user_id]['guessed_cities'] = []  # Очищаем список отгаданнных городов
+            session_storage[user_id]['guessed_cities'] = []
 
             # Предложение начать игру
             res['response']['text'] = f'Привет, {first_name.title()}! Давай попробуем угадать город по фотографии?'
-            res['response']['buttons'] = [
+            res['response']['buttons'] += [
                 {'title': 'Да', 'hide': True},
                 {'title': 'Нет', 'hide': True}
             ]
@@ -103,7 +109,7 @@ def handle_dialog(res, req):
                 res['end_session'] = True
             else:
                 res['response']['text'] = 'Не поняла тебя... Ты хочешь поиграть или нет?'
-                res['response']['buttons'] = [
+                res['response']['buttons'] += [
                     {'title': 'Да', 'hide': True},
                     {'title': 'Нет', 'hide': True}
                 ]
@@ -148,6 +154,17 @@ def get_first_name(req):
         if entity['type'] == 'YANDEX.FIO':
             return entity['value'].get('first_name')
     return None
+
+
+def show_help_message(res):
+    """Показываем сообщение с инструкциями"""
+    help_text = (
+        'Это простая игра, где нужно угадать загаданный мной город'
+        'по фотографиям достопримечательностей.\n\n'
+        '- Нажми **«Да»**, чтобы начать игру.\n'
+        '- Чтобы завершить игру, напиши **«нет»**. '
+    )
+    res['response']['text'] = help_text
 
 
 if __name__ == '__main__':
