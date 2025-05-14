@@ -25,6 +25,7 @@ city_coordinates = {
     'Париж': '48.856614,2.352222'
 }
 
+
 @app.route('/post', methods=['POST'])
 def main():
     """
@@ -64,10 +65,11 @@ def handle_dialog(res, req):
     if req['session']['new']:
         res['response']['text'] = 'Привет! Назови свое имя!'
         session_storage[user_id] = {
-            'first_name': None,       # Имя пользователя
-            'game_started': False,    # Флаг начала игры
-            'guessed_cities': [],     # Список отгаданных городов
-            'current_city': None      # Текущий загаданный город
+            'first_name': None,  # Имя пользователя
+            'game_started': False,  # Флаг начала игры
+            'guessed_cities': [],  # Список отгаданных городов
+            'current_city': None,  # Текущий загаданный город
+            'guess_country': False  # Флаг проверки страны
         }
         return
 
@@ -125,16 +127,30 @@ def handle_dialog(res, req):
             guessed_city = get_city(req)
 
             if guessed_city.lower() == current_city.lower():  # Правильный ответ!
-                res['response']['text'] = f'Верно! Это действительно {current_city}. Попробуем еще раз?'
-                session_storage[user_id]['guessed_cities'].append(current_city)
-                session_storage[user_id]['game_started'] = False
+                country = get_country_for_city(current_city)
+                session_storage[user_id]['guess_country'] = True
 
-                # Генерация ссылки на карту
-                city_coords = city_coordinates[current_city]
-                map_url = f'https://yandex.ru/maps/?mode=search&text={current_city}&ll={city_coords}'
-                res['response']['buttons'] += [
-                    {'title': 'Показать город на карте', 'url': map_url, 'hide': True}
-                ]
+                # Предлагаем угадать страну
+                res['response'][
+                    'text'] = f'Верно! Это действительно {current_city}. А теперь назови страну, в которой находится этот город!'
+            elif session_storage[user_id]['guess_country']:
+                # Игрок пытается угадать страну
+                guessed_country = get_country(req)
+                if guessed_country.lower() == country.lower():
+                    res['response'][
+                        'text'] = f'Правильно! Город {current_city} находится в стране {country}. Попробуем еще раз?'
+                    session_storage[user_id]['guessed_cities'].append(current_city)
+                    session_storage[user_id]['game_started'] = False
+                    session_storage[user_id]['guess_country'] = False
+
+                    # Генерация ссылки на карту
+                    city_coords = city_coordinates[current_city]
+                    map_url = f'https://yandex.ru/maps/?mode=search&text={current_city}&ll={city_coords}'
+                    res['response']['buttons'] += [
+                        {'title': 'Показать город на карте', 'url': map_url, 'hide': True}
+                    ]
+                else:
+                    res['response']['text'] = f'Упс, неверная страна. Подумайте ещё!'
             else:
                 next_photo_idx = len([x for x in session_storage[user_id]['guessed_cities'] if x != current_city])
                 if next_photo_idx >= len(cities[current_city]):
@@ -150,6 +166,24 @@ def handle_dialog(res, req):
                         'image_id': cities[current_city][next_photo_idx],
                     }
                     res['response']['text'] = 'Еще одна подсказка...'
+
+
+def get_country_for_city(city):
+    """Возвращает страну для заданного города."""
+    countries = {
+        'Москва': 'Россия',
+        'Нью-Йорк': 'США',
+        'Париж': 'Франция'
+    }
+    return countries.get(city, '')
+
+
+def get_country(req):
+    """Получаем название страны из запроса."""
+    for entity in req['request']['nlu']['entities']:
+        if entity['type'] == 'YANDEX.GEO':
+            return entity['value'].get('country')
+    return None
 
 
 def get_city(req):
